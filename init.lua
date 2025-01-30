@@ -160,6 +160,15 @@ require('lazy').setup({
 
   { 'mboros1/kernel-debug.nvim', opts = {}, dependencies = { 'MunifTanjim/nui.nvim' } },
 
+  {
+    'nvim-neotest/nvim-nio',
+    lazy = true,
+  },
+
+  { 'mfussenegger/nvim-dap' },
+  { 'rcarriga/nvim-dap-ui', dependencies = { 'mfussenegger/nvim-dap' } },
+  { 'jay-babu/mason-nvim-dap.nvim', dependencies = { 'williamboman/mason.nvim', 'mfussenegger/nvim-dap' } },
+
   -- Here is a more advanced example where we pass configuration
   -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
   --    require('gitsigns').setup({ ... })
@@ -513,13 +522,14 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        clangd = {},
+        -- clangd = {},
         -- cpptools = {},
         cmake = {},
         -- gopls = {},
         awk_ls = {},
         pyright = {},
-        -- rust_analyzer = {},
+        elixirls = {},
+        rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -872,3 +882,72 @@ P = function(v)
   print(vim.inspect(v))
   return v
 end
+
+local dap, dapui = require 'dap', require 'dapui'
+
+dap.adapters.codelldb = {
+  type = 'server',
+  port = '${port}',
+  executable = {
+    command = os.getenv 'HOME' .. '/.local/share/nvim/mason/bin/codelldb', -- Adjust path if needed
+    args = { '--port', '${port}' },
+  },
+}
+
+dap.configurations.rust = {
+  {
+    name = 'Launch Rust Debug',
+    type = 'codelldb',
+    request = 'launch',
+    program = function()
+      return vim.fn.input('Path to executable: ', vim.fn.getcwd() .. '/target/debug/', 'file')
+    end,
+    cwd = '${workspaceFolder}',
+    stopOnEntry = false,
+    terminal = 'integrated',
+  },
+}
+
+require('dapui').setup()
+
+dapui.setup()
+
+dap.listeners.after.event_initialized['dapui_config'] = function()
+  dapui.open()
+end
+
+dap.listeners.before.event_terminated['dapui_config'] = function()
+  dapui.close()
+end
+
+dap.listeners.before.event_exited['dapui_config'] = function()
+  dapui.close()
+end
+
+vim.keymap.set('n', '<Leader>du', function()
+  require('dapui').toggle()
+end, { desc = 'toggle debugger UI' })
+vim.keymap.set('n', '<F5>', function()
+  require('dap').continue()
+end)
+vim.keymap.set('n', '<F10>', function()
+  require('dap').step_over()
+end)
+vim.keymap.set('n', '<F11>', function()
+  require('dap').step_into()
+end)
+vim.keymap.set('n', '<F12>', function()
+  require('dap').step_out()
+end)
+vim.keymap.set('n', '<Leader>b', function()
+  require('dap').toggle_breakpoint()
+end, { desc = 'toggle breakpoint' })
+vim.keymap.set('n', '<Leader>B', function()
+  require('dap').set_breakpoint()
+end, { desc = 'set breakpoint' })
+vim.keymap.set('n', '<Leader>dr', function()
+  require('dap').repl.open()
+end, { desc = 'Open debug repl' })
+vim.keymap.set('n', '<Leader>dl', function()
+  require('dap').run_last()
+end, { desc = 'Debug run last' })
